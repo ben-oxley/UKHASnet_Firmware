@@ -786,5 +786,6 @@ int16_t rf69_sampleRssi(void);
 void rf69_SetLnaMode(uint8_t lnaMode);
 bool rf69_checkRx(void);
 void rf69_recv(uint8_t* buf, uint8_t* len);
+uint8_t rf69_lastRssi(void);
 
 #endif /* __RFM69_H__ */

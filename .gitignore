@@ -3,3 +3,11 @@
 */nodeconfig.h
 *.swp
 *.swo
+
+*.eep
+
+*.elf
+
+*.hex
+
+*.o

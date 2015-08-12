@@ -33,6 +33,10 @@ static uint8_t _bufLen;
 static uint8_t _buf[64];
 static uint8_t _lastRssi;
 
+uint8_t rf69_lastRssi(void){
+    return _lastRssi;
+}
+
 /**
  * Initialise the RFM69 device.
  * @returns 0 on failure, nonzero on success

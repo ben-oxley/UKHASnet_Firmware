@@ -30,11 +30,18 @@ static uint8_t sequence_id = 97; // 'a'
 static char databuf[64];
 static uint8_t buf[64], len;
 static uint8_t zombie_mode = 0; // Stores current status: 0 - Full Repeating, 1 - Low Power shutdown, (beacon only)
+/********************************************************************************
+Function Prototypes
+********************************************************************************/
+void USART_init(void);
+void USART_send( unsigned char data);
+void USART_putstring(char* StringPtr);
 uint16_t getRandBetween(uint16_t lower, uint16_t upper);
 void enableRepeat(void);
 int16_t gen_data(char *buf);
 void loop(void);
 void sendPacket(void);
+void sleep(uint8_t);
 /**
  * Measure the battery voltage.
  * @returns The voltage of the battery in Volts
@@ -107,7 +114,9 @@ void init(void)
 {
 
     /* Turn off peripherals that we don't use */
-    PRR |= _BV(PRTWI) | _BV(PRTIM2) | _BV(PRTIM1) | _BV(PRTIM0) | _BV(PRUSART0);
+    PRR |= _BV(PRTWI) | _BV(PRTIM2) | _BV(PRTIM1) | _BV(PRTIM0) ;//| _BV(PRUSART0);
+
+
 
     while(!rf69_init())
         _delay_ms(100);
@@ -155,13 +164,14 @@ int main(void)
 {
     init();
     rf69_setMode(RFM69_MODE_SLEEP);
-
+    #ifdef ENABLE_UART_OUTPUT
+    USART_init();
+    #endif
     /* Initial data interval = BEACON_INTERVAL since count = 0 */
     data_interval = BEACON_INTERVAL;
 
     while(1)
     {
-        _delay_ms(8000);
         loop();
     }
 
@@ -181,15 +191,17 @@ void loop(void)
       if (rf69_checkRx()) {
         rf69_recv(buf, &len);
         
-        /*#ifdef ENABLE_UART_OUTPUT
-         rx_rssi = rf69_lastRssi();
-         for (j=0; j<len; j++) {
-             Serial.print((char)buf[j]);
+        #ifdef ENABLE_UART_OUTPUT
+         uint8_t rx_rssi = rf69_lastRssi();
+         for (int j=0; j<len; j++) {
+             USART_send((char)buf[j]);
              if(buf[j]==']') break;
          }
-         Serial.print("|");
-         Serial.println(rx_rssi);
-        #endif*/
+         USART_send('|');
+         char str[5];
+         sprintf((char *)&str[0],"%i",rx_rssi);
+         USART_putstring(str);
+        #endif
 
         // find end of packet & start of repeaters
         uint8_t end_bracket = -1, start_bracket = -1;        
@@ -218,15 +230,16 @@ void loop(void)
           }
           
           rf69_send((uint8_t*)buf, packet_len, RFM_POWER);
-          /*#ifdef ENABLE_UART_OUTPUT
-             for (j=0; j<packet_len; j++) {
+          #ifdef ENABLE_UART_OUTPUT
+             for (int j=0; j<packet_len; j++) {
                  if(buf[j]==']'){
-                    Serial.println((char)buf[j]);
+                    USART_send((char)buf[j]);
+                    USART_send('\n');
                     break;
                  }
-                 Serial.print((char)buf[j]);
+                 USART_send((char)buf[j]);
              }
-            #endif*/
+            #endif
         }
       }
     }
@@ -235,7 +248,7 @@ void loop(void)
     
     // Low Power Sleep for 8 seconds
     rf69_setMode(RFM69_MODE_SLEEP);
-    _delay_ms(8000u);
+    sleep(8u);
   }
   
   if (count >= data_interval){
@@ -247,18 +260,19 @@ void loop(void)
     
     packet_len = gen_data(databuf);
     rf69_send((uint8_t*)databuf, packet_len, RFM_POWER);
-    /*#ifdef ENABLE_UART_OUTPUT
+    #ifdef ENABLE_UART_OUTPUT
      // Print own Beacon Packet
-     for (j=0; j<packet_len; j++)
+     for (int j=0; j<packet_len; j++)
      {
-         if(data[j]==']') // Check for last char in packet
+         if(databuf[j]==']') // Check for last char in packet
          {
-             Serial.println(data[j]);
+             USART_send(databuf[j]);
+             USART_send('\n');
              break;
          }
-         Serial.print(data[j]);
+         USART_send(databuf[j]);
      }
-    #endif*/
+    #endif
     
     data_interval = getRandBetween((BEACON_INTERVAL/8), (BEACON_INTERVAL/8)+2) + count;
     #ifdef ENABLE_ZOMBIE_MODE
@@ -280,6 +294,48 @@ uint16_t getRandBetween(uint16_t lower, uint16_t upper){
     return (uint16_t)(((double)rand() / ((double)RAND_MAX + 1) * (upper-lower))+lower);
 }
 
+/********************************************************************************
+usart Related
+********************************************************************************/
+void USART_init(void){
+ 
+ UBRR0H = (uint8_t)(BAUD_PRESCALLER>>8);
+ UBRR0L = (uint8_t)(BAUD_PRESCALLER);
+ UCSR0B = (1<<RXEN0)|(1<<TXEN0);
+ UCSR0C = (3<<UCSZ00);
+}
+
+void USART_send( unsigned char data){
+ 
+ while(!(UCSR0A & (1<<UDRE0)));
+ UDR0 = data;
+ 
+}
+ 
+void USART_putstring(char* StringPtr){
+ 
+while(*StringPtr != 0x00){
+ USART_send(*StringPtr);
+ StringPtr++;}
+ 
+}
+
+void sleep(uint8_t seconds){
+   /* Enable the watchdog and sleep for 8 seconds */
+    for (int i = 0; i < seconds; i++){
+        wdt_enable(WDTO_1S);
+        WDTCSR |= (1 << WDIE);
+        set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+        sleep_enable();
+        sei();
+        sleep_cpu();
+        sleep_disable();
+        wdt_reset();
+    }
+    wdt_enable(WDTO_8S);
+    wdt_reset();
+}
+
 /**
  * Watchdog interrupt
  */
@@ -287,3 +343,5 @@ ISR(WDT_vect)
 {
     wdt_disable();
 }
+
+
