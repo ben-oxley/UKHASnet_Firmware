@@ -1,6 +1,7 @@
-# Name: Makefile
+# Name: UKHASNet AVR Sensor 
 # Project: AVR UKHASNet Project
 # Author: Jon Sowman <jon@jonsowman.com> 
+# Modified Auguust 2015
 
 # DEVICE ....... The AVR device you compile for
 # CLOCK ........ Target AVR clock rate in Hertz
@@ -11,19 +12,23 @@
 #                is connected.
 # FUSES ........ Parameters for avrdude to flash the fuses appropriately.
 
+# Where the RFM69 library (ukhasnet-rfm69) is located relative to here
+RFMLIBDIR  = ukhasnet-rfm69
+DHT22LIBDIR = sensors
+
+# Configure the following settings according to the device in use
 DEVICE     = m328p
-CLOCK      = 8000000
-PROGRAMMER = -c avrispmkII -P usb -B 5
-SOURCES	   = $(wildcard *.c)
-FUSES      = -U hfuse:w:0xde:m -U lfuse:w:0xd2:m
+CLOCK      = 1000000
+PROGRAMMER = -c avrispmkII -P /dev/tty.usbserial -B 5
+SOURCES	   = $(wildcard *.c) $(wildcard $(RFMLIBDIR)/*.c) $(wildcard $(DHT22LIBDIR)/*.c)
+FUSES      = -U hfuse:w:0xdf:m -U lfuse:w:0x62:m
 
 # End configuration
-
 OBJECTS = $(SOURCES:.c=.o)
 AVRDUDE = avrdude $(PROGRAMMER) -p $(DEVICE)
 
 # Compiler flags. Optimise for code size. Allow C99 standards.
-COMPILE = avr-gcc -Wall -Os -gdwarf-2 -std=gnu99 -DF_CPU=$(CLOCK) -mmcu=atmega328p
+COMPILE = avr-gcc -Wall -Wextra -pedantic -Os -gdwarf-2 -std=gnu99 -DF_CPU=$(CLOCK) -mmcu=atmega328p -I ./$(RFMLIBDIR) -I./$(DHT22LIBDIR) 
 
 # symbolic targets:
 all:	main.hex
