@@ -1,0 +1,3 @@
+[submodule "avr_repeater/ukhasnet-rfm69"]
+	path = avr_repeater/ukhasnet-rfm69
+	url = https://github.com/UKHASnet/ukhasnet-rfm69.git
